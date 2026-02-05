@@ -111,6 +111,8 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     var trueColors: [Attribute.Color:NSColor] = [:]
     var transparent = TTColor.transparent ()
     var isBigSur = true
+    var preserveSelectionOnOutput = false
+    private var preserveSelectionResetWorkItem: DispatchWorkItem?
     
     /// This flag is automatically set to true after the initializer is called, if running on a system older than BigSur.
     /// Starting with BigSur any screen updates will invoke the draw() method with the whole region, regardless
@@ -364,7 +366,9 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     }
     
     open func linefeed(source: Terminal) {
-        selection.selectNone()
+        if !preserveSelectionOnOutput {
+            selection.selectNone()
+        }
     }
     
     /// This vaiable controls whether mouse events are sent to the application running under the
@@ -424,6 +428,26 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     {
         NSCursor.iBeam.set ()
     }
+
+    private func schedulePreserveSelectionReset() {
+        preserveSelectionResetWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.preserveSelectionOnOutput = false
+        }
+        preserveSelectionResetWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+    }
+
+    public override func viewWillStartLiveResize() {
+        super.viewWillStartLiveResize()
+        preserveSelectionResetWorkItem?.cancel()
+        preserveSelectionOnOutput = true
+    }
+
+    public override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        schedulePreserveSelectionReset()
+    }
     
     func makeFirstResponder ()
     {
@@ -437,6 +461,10 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         set(newValue) {
             super.frame = newValue
             guard cellDimension != nil else { return }
+            if selection?.active == true {
+                preserveSelectionOnOutput = true
+                schedulePreserveSelectionReset()
+            }
             processSizeChange(newSize: newValue.size)
             needsDisplay = true
             updateCursorPosition()
@@ -451,7 +479,6 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     public override func resizeSubviews(withOldSize oldSize: NSSize) {
         super.resizeSubviews(withOldSize: oldSize)
         updateScroller()
-        selection.active = false
     }
     
     private var _hasFocus = false

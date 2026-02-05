@@ -14,6 +14,11 @@ import Foundation
  * the terminal's buffer.  They are guaranteed to be ordered.
  */
 public class SelectionService: CustomDebugStringConvertible {
+    struct SelectionAnchor {
+        let logicalLineIndex: Int
+        let offset: Int
+    }
+
     var terminal: Terminal
     
     public init (terminal: Terminal)
@@ -540,6 +545,104 @@ public class SelectionService: CustomDebugStringConvertible {
         }
         let r = terminal.getDisplayText(start: min, end: max)
         return r
+    }
+
+    func captureAnchors () -> (start: SelectionAnchor, end: SelectionAnchor)? {
+        guard active else { return nil }
+        let buffer = terminal.displayBuffer
+        guard let startAnchor = captureAnchor(for: start, in: buffer),
+              let endAnchor = captureAnchor(for: end, in: buffer) else {
+            return nil
+        }
+        return (start: startAnchor, end: endAnchor)
+    }
+
+    func restoreAnchors (_ anchors: (start: SelectionAnchor, end: SelectionAnchor)) {
+        let buffer = terminal.displayBuffer
+        guard let startPosition = position(for: anchors.start, in: buffer),
+              let endPosition = position(for: anchors.end, in: buffer) else {
+            selectNone()
+            return
+        }
+        let maxRow = max(buffer.lines.count - 1, 0)
+        let startRow = min(max(startPosition.row, 0), maxRow)
+        let endRow = min(max(endPosition.row, 0), maxRow)
+        let startCol = min(max(startPosition.col, 0), buffer.cols - 1)
+        let endCol = min(max(endPosition.col, 0), buffer.cols)
+        start = Position(col: startCol, row: startRow)
+        end = Position(col: endCol, row: endRow)
+        setActiveAndNotify()
+    }
+
+    private func captureAnchor (for position: Position, in buffer: Buffer) -> SelectionAnchor? {
+        guard buffer.lines.count > 0 else { return nil }
+        let clampedRow = min(max(position.row, 0), buffer.lines.count - 1)
+        let clampedCol = min(max(position.col, 0), buffer.cols)
+        let lineStart = logicalLineStartRowForRow(clampedRow, in: buffer)
+        let logicalLineIndex = logicalLineIndex(for: lineStart, in: buffer)
+        var offset = 0
+        if clampedRow > lineStart {
+            for row in lineStart..<clampedRow {
+                offset += buffer.getWrappedLineTrimmedLength(buffer.lines, row, buffer.cols)
+            }
+        }
+        offset += clampedCol
+        return SelectionAnchor(logicalLineIndex: logicalLineIndex, offset: offset)
+    }
+
+    private func position (for anchor: SelectionAnchor, in buffer: Buffer) -> Position? {
+        guard let startRow = logicalLineStartRowForIndex(anchor.logicalLineIndex, in: buffer) else { return nil }
+        var remaining = max(anchor.offset, 0)
+        var row = startRow
+        while row < buffer.lines.count {
+            let lineLength = buffer.getWrappedLineTrimmedLength(buffer.lines, row, buffer.cols)
+            if remaining <= lineLength {
+                let col = min(remaining, buffer.cols)
+                return Position(col: col, row: row)
+            }
+            remaining -= lineLength
+            let nextRow = row + 1
+            if nextRow >= buffer.lines.count || !buffer.lines[nextRow].isWrapped {
+                let col = min(lineLength, buffer.cols)
+                return Position(col: col, row: row)
+            }
+            row = nextRow
+        }
+        return nil
+    }
+
+    private func logicalLineStartRowForRow (_ row: Int, in buffer: Buffer) -> Int {
+        var start = row
+        while start > 0 && buffer.lines[start].isWrapped {
+            start -= 1
+        }
+        return start
+    }
+
+    private func logicalLineIndex (for startRow: Int, in buffer: Buffer) -> Int {
+        var index = 0
+        for row in 0..<buffer.lines.count {
+            if !buffer.lines[row].isWrapped {
+                if row == startRow {
+                    return index
+                }
+                index += 1
+            }
+        }
+        return max(index - 1, 0)
+    }
+
+    private func logicalLineStartRowForIndex (_ logicalLineIndex: Int, in buffer: Buffer) -> Int? {
+        var index = 0
+        for row in 0..<buffer.lines.count {
+            if !buffer.lines[row].isWrapped {
+                if index == logicalLineIndex {
+                    return row
+                }
+                index += 1
+            }
+        }
+        return nil
     }
     
     public var debugDescription: String {

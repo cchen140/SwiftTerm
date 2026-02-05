@@ -141,8 +141,11 @@ extension TerminalView {
         let newCols = Int (getEffectiveWidth (size: newSize) / cellDimension.width)
         
         if newCols != terminal.cols || newRows != terminal.rows {
-            selection.active = false
+            let selectionAnchors = selection.captureAnchors()
             terminal.resize (cols: newCols, rows: newRows)
+            if let selectionAnchors {
+                selection.restoreAnchors(selectionAnchors)
+            }
             
             // These used to be outside
             accessibility.invalidate ()
@@ -1429,7 +1432,9 @@ extension TerminalView {
     func feedPrepare()
     {
         search.invalidate()
-        selection.active = false
+        if !preserveSelectionOnOutput {
+            selection.active = false
+        }
         startDisplayUpdates()
     }
     
@@ -1460,7 +1465,11 @@ extension TerminalView {
      */
     public func resize (cols: Int, rows: Int)
     {
+        let selectionAnchors = selection.captureAnchors()
         terminal.resize (cols: cols, rows: rows)
+        if let selectionAnchors {
+            selection.restoreAnchors(selectionAnchors)
+        }
         sizeChanged (source: terminal)
         terminal.softReset()
     }

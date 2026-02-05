@@ -176,6 +176,7 @@ open class TerminalView: UIScrollView, UITextInputTraits, UIKeyInput, UIScrollVi
     var colors: [UIColor?] = Array(repeating: nil, count: 256)
     var trueColors: [Attribute.Color:UIColor] = [:]
     var transparent = TTColor.transparent ()
+    var preserveSelectionOnOutput = false
 
     public func setSearchHighlights(_ highlights: [Int: [Range<Int>]]) {
         searchHighlights = highlights
@@ -1012,8 +1013,10 @@ open class TerminalView: UIScrollView, UITextInputTraits, UIKeyInput, UIScrollVi
     }
     
     open func linefeed(source: Terminal) {
-        selection.selectNone()
-        disableSelectionPanGesture()
+        if !preserveSelectionOnOutput {
+            selection.selectNone()
+            disableSelectionPanGesture()
+        }
     }
     
     func updateScroller ()
