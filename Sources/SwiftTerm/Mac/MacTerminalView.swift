@@ -96,6 +96,8 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     public var terminal: Terminal!
 
     public var selection: SelectionService!
+    public private(set) var searchHighlights: [Int: [Range<Int>]] = [:]
+    public var searchHighlightColor: NSColor = NSColor.systemYellow.withAlphaComponent(0.35)
     private var scroller: NSScroller!
     
     // Attribute dictionary, maps a console attribute (color, flags) to the corresponding dictionary
@@ -268,6 +270,11 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         set {
             _selectedTextBackgroundColor = newValue
         }
+    }
+
+    public func setSearchHighlights(_ highlights: [Int: [Range<Int>]]) {
+        searchHighlights = highlights
+        needsDisplay = true
     }
 
     func backingScaleFactor () -> CGFloat

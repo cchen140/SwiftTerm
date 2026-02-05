@@ -10,6 +10,7 @@ import Foundation
 extension NSAttributedString.Key {
     static let fullBackgroundColor: NSAttributedString.Key = .init("SwiftTerm_fullBackgroundColor") // NSColor, default nil: no background
     static let selectionBackgroundColor: NSAttributedString.Key = .init("SwiftTerm_selectionBackgroundColor") // NSColor, default nil: no background
+    static let searchBackgroundColor: NSAttributedString.Key = .init("SwiftTerm_searchBackgroundColor") // NSColor, default nil: no background
 }
 
 extension NSMutableAttributedString {

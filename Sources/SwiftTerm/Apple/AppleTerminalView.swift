@@ -519,6 +519,7 @@ extension TerminalView {
     {
         var segments: [ViewLineSegment] = []
         let selectionColumns = selectedColumnsRange(row: row, cols: cols)
+        let searchHighlightRanges = searchHighlightRanges(row: row)
         var col = 0
         var builder: ViewLineSegmentBuilder?
         var kittyPlaceholders: [KittyPlaceholderCell] = []
@@ -549,6 +550,9 @@ extension TerminalView {
             }
             
             var currentAttributes = attributes
+            if isColumnHighlighted(searchHighlightRanges, column: col, width: width) {
+                currentAttributes[.searchBackgroundColor] = searchHighlightColor
+            }
             if isColumnSelected(selectionColumns, column: col, width: width) {
                 currentAttributes[.selectionBackgroundColor] = selectedTextBackgroundColor
             }
@@ -653,6 +657,23 @@ extension TerminalView {
         }
         let endColumn = column + width
         return selectionRange.lowerBound < endColumn && column < selectionRange.upperBound
+    }
+
+    func searchHighlightRanges(row: Int) -> [Range<Int>]? {
+        searchHighlights[row]
+    }
+
+    func isColumnHighlighted(_ highlightRanges: [Range<Int>]?, column: Int, width: Int) -> Bool {
+        guard let highlightRanges else {
+            return false
+        }
+        let endColumn = column + width
+        for range in highlightRanges {
+            if range.lowerBound < endColumn && column < range.upperBound {
+                return true
+            }
+        }
+        return false
     }
 
     func drawRunAttributes(_ attributes: [NSAttributedString.Key : Any], glyphPositions positions: [CGPoint], in currentContext: CGContext) {
@@ -865,6 +886,8 @@ extension TerminalView {
                     var backgroundColor: TTColor?
                     if runAttributes.keys.contains(.selectionBackgroundColor) {
                         backgroundColor = runAttributes[.selectionBackgroundColor] as? TTColor
+                    } else if runAttributes.keys.contains(.searchBackgroundColor) {
+                        backgroundColor = runAttributes[.searchBackgroundColor] as? TTColor
                     } else if runAttributes.keys.contains(.backgroundColor) {
                         backgroundColor = runAttributes[.backgroundColor] as? TTColor
                     }

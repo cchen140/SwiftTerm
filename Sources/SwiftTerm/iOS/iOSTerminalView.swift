@@ -160,6 +160,8 @@ open class TerminalView: UIScrollView, UITextInputTraits, UIKeyInput, UIScrollVi
     var terminal: Terminal!
     
     var selection: SelectionService!
+    public private(set) var searchHighlights: [Int: [Range<Int>]] = [:]
+    public var searchHighlightColor: UIColor = UIColor.systemYellow.withAlphaComponent(0.35)
     var attrStrBuffer: CircularList<ViewLineInfo>!
     var images:[(image: TerminalImage, col: Int, row: Int)] = []
 
@@ -174,6 +176,11 @@ open class TerminalView: UIScrollView, UITextInputTraits, UIKeyInput, UIScrollVi
     var colors: [UIColor?] = Array(repeating: nil, count: 256)
     var trueColors: [Attribute.Color:UIColor] = [:]
     var transparent = TTColor.transparent ()
+
+    public func setSearchHighlights(_ highlights: [Int: [Range<Int>]]) {
+        searchHighlights = highlights
+        setNeedsDisplay()
+    }
     
     // UITextInput support starts
     public lazy var tokenizer: UITextInputTokenizer = UITextInputStringTokenizer (textInput: self) // TerminalInputTokenizer()
