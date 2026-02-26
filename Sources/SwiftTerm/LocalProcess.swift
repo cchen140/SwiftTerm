@@ -232,12 +232,13 @@ public class LocalProcess {
         if running {
             return
         }
-        
-        #if canImport(Subprocess)
-        startProcessWithSubprocess(executable: executable, args: args, environment: environment, execName: execName, currentDirectory: currentDirectory)
-        #else
+
+        // Always use forkpty: it calls login_tty() in the child, which sets the slave PTY
+        // as the controlling terminal (TIOCSCTTY). This is required for job control signals
+        // (Ctrl+C → SIGINT, Ctrl+Z → SIGTSTP) to reach foreground processes.
+        // The Subprocess path uses openpty+POSIX_SPAWN_SETSID but omits TIOCSCTTY,
+        // so signals are generated but never delivered to child processes.
         startProcessWithForkpty(executable: executable, args: args, environment: environment, execName: execName, currentDirectory: currentDirectory)
-        #endif
     }
     
     #if canImport(Subprocess)
