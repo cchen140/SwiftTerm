@@ -668,6 +668,13 @@ open class Terminal {
         return buffer.lines [row-buffer.linesTop]
     }
 
+    /// Returns the scroll-invariant line range for the active buffer.
+    /// The lowerBound is the absolute line index of the first line stored in the current buffer.
+    public func getScrollInvariantLineRange () -> Range<Int> {
+        let start = buffer.linesTop
+        return start..<(start + buffer.lines.count)
+    }
+
     /// Returns the character at the specified column and row, these are zero-based
     /// - Parameter col: column to retrieve, starts at 0
     /// - Parameter row: row to retrieve, starts at 0
