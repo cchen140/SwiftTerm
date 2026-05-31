@@ -95,12 +95,17 @@ extension TerminalView {
         // Get the ascent + descent + leading from the font, already scaled for the font's size
         self.cellDimension = computeFontDimensions ()
         
-        let terminalOptions = TerminalOptions(cols: Int(width / cellDimension.width),
+        var terminalOptions = TerminalOptions(cols: Int(width / cellDimension.width),
                                               rows: Int(height / cellDimension.height))
-        
+
         if terminal == nil {
             terminal = Terminal(delegate: self, options: terminalOptions)
         } else {
+            // Preserve settings that should survive a font/resize update so callers
+            // that reduce the kitty image cache limit (or scrollback) don't have
+            // those values silently reset back to defaults.
+            terminalOptions.kittyImageCacheLimitBytes = terminal.options.kittyImageCacheLimitBytes
+            terminalOptions.scrollback = terminal.options.scrollback
             terminal.options = terminalOptions
             terminal.setup(isReset: false)
         }
@@ -222,11 +227,17 @@ extension TerminalView {
             if let tc = trueColors [color] {
                 return tc
             }
+            // Evict the whole cache when it grows too large to prevent unbounded memory
+            // growth from terminals rendering many unique true colors (sixel, kitty images,
+            // rich color prompts, etc.)
+            if trueColors.count > 2_000 {
+                trueColors.removeAll(keepingCapacity: false)
+            }
             let newColor = TTColor.make(red: CGFloat (r) / 255.0,
                                         green: CGFloat (g) / 255.0,
                                         blue: CGFloat (b) / 255.0,
                                         alpha: 1.0)
-            
+
             trueColors [color] = newColor
             return newColor
         }
@@ -237,7 +248,8 @@ extension TerminalView {
     {
         urlAttributes = [:]
         attributes = [:]
-        
+        trueColors = [:]
+
         terminal.updateFullScreen ()
         queuePendingDisplay()
     }
@@ -418,11 +430,17 @@ extension TerminalView {
         if withUrl {
             nsattr [.underlineStyle] = NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDash.rawValue
             nsattr [.underlineColor] = fgColor
-            
-            // Add to cache
+
+            // Evict the cache when it grows too large
+            if urlAttributes.count > 2_000 {
+                urlAttributes.removeAll(keepingCapacity: false)
+            }
             urlAttributes [attribute] = nsattr
         } else {
-            // Just add to cache
+            // Evict the cache when it grows too large
+            if attributes.count > 4_000 {
+                attributes.removeAll(keepingCapacity: false)
+            }
             attributes [attribute] = nsattr
         }
         return nsattr
